@@ -20,7 +20,7 @@ const DashboardPage = () => {
   return (
     <div>
       <h1>Welcome to your dashboard, {session.user?.name || "User"}!</h1>
-      <ProfileForm email={session.user?.email || ""} />
+      <ProfileForm />
     </div>
   );
 };
