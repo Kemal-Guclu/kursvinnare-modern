@@ -2,10 +2,10 @@ import { withAuth } from "next-auth/middleware";
 
 export default withAuth({
   pages: {
-    signIn: "/auth/signin",
+    signIn: "/login",
   },
 });
 
 export const config = {
-  matcher: ["/dashboard/:path*"], // skydda dashboard
+  matcher: ["/dashboard"], // skydda dashboard
 };

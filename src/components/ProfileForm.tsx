@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useSession } from "next-auth/react";
 import axios from "axios";
@@ -17,14 +17,15 @@ type ProfileResponse = {
 };
 
 export default function ProfileForm() {
-  useSession(); // session används ej direkt här
-
+  const [isSaved, setIsSaved] = useState(false);
   const {
     register,
     handleSubmit,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormData>();
+
+  useSession(); // vi använder session indirekt, men behövs ej just nu
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -42,12 +43,22 @@ export default function ProfileForm() {
   const onSubmit = async (data: FormData) => {
     try {
       await axios.put("/api/user/profile", data);
-      alert("Profil uppdaterad!");
+      setIsSaved(true); // visa tackmeddelande
     } catch (error) {
       console.error("Fel vid uppdatering", error);
       alert("Det gick inte att uppdatera profilen.");
     }
   };
+
+  if (isSaved) {
+    return (
+      <div className="text-center mt-6">
+        <p className="text-green-600 text-lg font-medium">
+          Namnet har sparats! ✅
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form
