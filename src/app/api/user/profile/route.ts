@@ -1,50 +1,32 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma"; // Se till att du har prisma-instans i lib/prisma.ts
-import { getServerSession } from "next-auth"; // Importera sessionen om du använder NextAuth.js
+// src/pages/api/user/profile.ts
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import type { NextApiRequest, NextApiResponse } from "next";
 
-// Hämtar användardata från databasen baserat på sessionen
-export async function GET() {
-  // Ta bort req här
-  const session = await getServerSession(); // Hämta användarsessionen
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) return res.status(401).json({ error: "Ej auktoriserad" });
+
+  const userEmail = session.user?.email;
+  if (!userEmail) return res.status(400).json({ error: "Ingen e-post" });
+
+  if (req.method === "GET") {
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    return res.status(200).json({ name: user?.name || "" });
   }
 
-  // Hämta användardata från databasen
-  const user = await prisma.user.findUnique({
-    where: {
-      email: session.user.email,
-    },
-    select: {
-      name: true,
-      email: true,
-    },
-  });
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (req.method === "PUT") {
+    const { name } = req.body;
+    await prisma.user.update({
+      where: { email: userEmail },
+      data: { name },
+    });
+    return res.status(200).json({ message: "Namn uppdaterat" });
   }
 
-  return NextResponse.json(user); // Returnera användardata som JSON
-}
-
-// Uppdaterar användarens profil
-export async function PUT(req: Request) {
-  const session = await getServerSession();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { name } = await req.json(); // Hämta den nya namn-data från PUT-förfrågan
-  if (!name) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
-  }
-
-  // Uppdatera användarens profil i databasen
-  const user = await prisma.user.update({
-    where: { email: session.user.email },
-    data: { name },
-  });
-
-  return NextResponse.json(user); // Returnera den uppdaterade användaren
+  res.status(405).end();
 }

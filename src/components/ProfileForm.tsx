@@ -1,58 +1,85 @@
 "use client";
 
-import React from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import axios from "axios";
 import { useSession } from "next-auth/react";
+import axios from "axios";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
-const ProfileForm = () => {
-  const { data: session } = useSession();
+type FormData = {
+  name: string;
+};
 
+type ProfileResponse = {
+  name: string;
+};
+
+export default function ProfileForm() {
+  const [isSaved, setIsSaved] = useState(false);
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm<{ name: string }>({
-    defaultValues: async () => {
-      const res = await axios.get<{ name: string }>("/api/user/profile");
-      return { name: res.data.name };
-    },
-  });
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>();
 
-  const onSubmit = async (data: { name: string }) => {
+  useSession(); // vi använder session indirekt, men behövs ej just nu
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await axios.get<ProfileResponse>("/api/user/profile");
+        setValue("name", res.data.name);
+      } catch (error) {
+        console.error("Kunde inte hämta profil", error);
+      }
+    };
+
+    fetchProfile();
+  }, [setValue]);
+
+  const onSubmit = async (data: FormData) => {
     try {
       await axios.put("/api/user/profile", data);
-      alert("Profil uppdaterad!");
+      setIsSaved(true); // visa tackmeddelande
     } catch (error) {
       console.error("Fel vid uppdatering", error);
+      alert("Det gick inte att uppdatera profilen.");
     }
   };
 
-  if (!session) {
-    return <p>Du måste vara inloggad för att se profilen.</p>;
+  if (isSaved) {
+    return (
+      <div className="text-center mt-6">
+        <p className="text-green-600 text-lg font-medium">
+          Namnet har sparats! ✅
+        </p>
+      </div>
+    );
   }
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="space-y-6 max-w-md mx-auto"
+      className="space-y-6 max-w-md mx-auto mt-6"
     >
-      <p>E-post: {session.user?.email}</p>
-
       <div className="space-y-2">
-        <label htmlFor="name">Namn</label>
-        <input
+        <Label htmlFor="name">Namn</Label>
+        <Input
           id="name"
           {...register("name", { required: "Namn krävs" })}
-          type="text"
-          className="input-class"
+          placeholder="Ditt namn"
         />
-        {errors.name && <p className="text-red-500">{errors.name.message}</p>}
+        {errors.name && (
+          <p className="text-sm text-red-500">{errors.name.message}</p>
+        )}
       </div>
 
-      <button type="submit">Uppdatera Profil</button>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Sparar..." : "Spara"}
+      </Button>
     </form>
   );
-};
-
-export default ProfileForm;
+}

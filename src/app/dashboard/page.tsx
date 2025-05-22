@@ -1,28 +1,19 @@
-"use client";
+// src/app/dashboard/page.tsx
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth"; // Se till att denna exporteras
+import ProfileForm from "@/components/ProfileForm";
 
-import React from "react";
-import { useSession } from "next-auth/react"; // Om du använder next-auth för sessioner
-import ProfileForm from "@/components/ProfileForm"; // Se till att importen är korrekt
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
 
-const DashboardPage = () => {
-  const { data: session, status } = useSession();
-
-  // Hantera laddningstillståndet för session
-  if (status === "loading") {
-    return <div>Loading...</div>;
-  }
-
-  // Om sessionen inte finns, visa ett meddelande
   if (!session) {
-    return <div>You must be logged in to view this page.</div>;
+    return <div>Du måste vara inloggad för att se denna sida.</div>;
   }
 
   return (
     <div>
-      <h1>Welcome to your dashboard, {session.user?.name || "User"}!</h1>
+      <h1>Välkommen till din dashboard, {session.user?.name || "User"}!</h1>
       <ProfileForm />
     </div>
   );
-};
-
-export default DashboardPage;
+}

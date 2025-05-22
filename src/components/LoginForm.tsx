@@ -1,11 +1,13 @@
 "use client";
-import { signIn } from "next-auth/react"; // Importera signIn
+
+import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useState } from "react";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Ogiltig e-postadress" }),
@@ -15,6 +17,8 @@ const loginSchema = z.object({
 type LoginSchema = z.infer<typeof loginSchema>;
 
 export default function LoginForm() {
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -24,6 +28,7 @@ export default function LoginForm() {
   });
 
   const onSubmit = async (data: LoginSchema) => {
+    setLoginError(null); // Rensa tidigare fel
     const result = await signIn("credentials", {
       redirect: false,
       email: data.email,
@@ -31,10 +36,8 @@ export default function LoginForm() {
     });
 
     if (result?.error) {
-      console.error(result.error);
-      // Hantera felmeddelande här
+      setLoginError("Fel e-postadress eller lösenord.");
     } else {
-      // Vid lyckad inloggning, redirecta användaren till dashboard eller en annan sida
       window.location.href = "/dashboard";
     }
   };
@@ -44,6 +47,10 @@ export default function LoginForm() {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-6 max-w-md mx-auto"
     >
+      {loginError && (
+        <p className="text-sm text-red-600 font-semibold">{loginError}</p>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="email">E-post</Label>
         <Input id="email" type="email" {...register("email")} />

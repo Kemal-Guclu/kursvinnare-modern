@@ -1,11 +1,14 @@
+// src/components/RegisterForm.tsx
 "use client";
-import { signIn } from "next-auth/react"; // Importera signIn
+
+import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useState } from "react";
 
 const registerSchema = z
   .object({
@@ -21,6 +24,8 @@ const registerSchema = z
 type RegisterSchema = z.infer<typeof registerSchema>;
 
 export default function RegisterForm() {
+  const [errorMsg, setErrorMsg] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -30,18 +35,35 @@ export default function RegisterForm() {
   });
 
   const onSubmit = async (data: RegisterSchema) => {
-    // Skicka registreringsdata till backend här (eller använd en direkt API-kall)
-    // Efter lyckad registrering, logga in användaren
-    const result = await signIn("credentials", {
+    setErrorMsg("");
+
+    // Steg 1: Skicka till backend
+    const res = await fetch("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: data.email,
+        password: data.password,
+      }),
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      setErrorMsg(result.message || "Ett fel uppstod vid registrering");
+      return;
+    }
+
+    // Steg 2: Logga in automatiskt
+    const signInResult = await signIn("credentials", {
       redirect: false,
       email: data.email,
       password: data.password,
     });
 
-    if (result?.error) {
-      console.error(result.error);
+    if (signInResult?.error) {
+      setErrorMsg("Kunde inte logga in automatiskt");
     } else {
-      // Vid lyckad inloggning, omdirigera till dashboard eller annan sida
       window.location.href = "/dashboard";
     }
   };
@@ -80,6 +102,8 @@ export default function RegisterForm() {
           </p>
         )}
       </div>
+
+      {errorMsg && <p className="text-sm text-red-600">{errorMsg}</p>}
 
       <Button type="submit" className="w-full">
         Registrera
