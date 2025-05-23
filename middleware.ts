@@ -1,42 +1,20 @@
-// src/middleware.ts
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-// Lista på offentliga vägar som inte kräver autentisering
-const publicRoutes = [
-  "/",
-  "/om",
-  "/kontakt",
-  "/api/public", // exempel på publik API-rutt
-];
-
-// Middleware-funktion med withAuth från next-auth
 export default withAuth(
-  function middleware(req) {
-    const { pathname } = req.nextUrl;
-
-    // Tillåt offentliga sidor
-    if (publicRoutes.includes(pathname)) {
-      return NextResponse.next();
-    }
-
-    // Annars: autentisering krävs (sköts av withAuth)
-    return NextResponse.next();
+  function middleware() {
+    return NextResponse.next(); // middleware kan också modifiera response om du vill
   },
   {
     callbacks: {
-      authorized: ({ token }) => {
-        // true = tillåt endast om JWT-token finns
-        return !!token;
-      },
+      authorized: ({ token }) => !!token, // Endast inloggade släpps igenom
+    },
+    pages: {
+      signIn: "/login", // ✅ Skicka obehöriga användare till /login
     },
   }
 );
 
-// Konfiguration: vilka rutter ska kontrolleras av middleware
 export const config = {
-  matcher: [
-    "/dashboard/:path*",
-    // Lägg till fler skyddade sidor här om du vill
-  ],
+  matcher: ["/dashboard/:path*"], // Skydda dashboard och dess undersidor
 };
