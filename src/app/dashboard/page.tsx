@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth"; // Se till att denna exporteras
-import ProfileForm from "@/components/ProfileForm";
+import ProfileForm from "@/app/dashboard/components/ProfileForm";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
