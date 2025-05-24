@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import DashboardWatchlist from "./components/DashboardWatchlist";
 
 export default function DashboardPageClient({ name }: { name: string }) {
   return (
@@ -14,6 +15,8 @@ export default function DashboardPageClient({ name }: { name: string }) {
       >
         Uppdatera profil
       </Link>
+
+      <DashboardWatchlist />
     </div>
   );
 }
