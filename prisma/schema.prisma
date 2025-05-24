@@ -20,6 +20,7 @@ model User {
   hashedPassword String?
   accounts      Account[]
   sessions      Session[]
+  watchlists    Watchlist[] // Added relation field for Watchlist
 }
 
 model Account {
@@ -55,4 +56,27 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Asset {
+  id       String   @id @default(cuid())
+  slug     String   @unique
+  name     String
+  type     String   // t.ex. "crypto", "aktie-svensk", "aktie-usa"
+  symbol   String   // t.ex. BTC, AAPL
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  watchlists Watchlist[]
+}
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assetId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, assetId]) // Förhindra duplicerade favoriter
 }
