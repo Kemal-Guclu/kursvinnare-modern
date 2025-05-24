@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Moon, Sun, Menu } from "lucide-react";
 import { useTheme } from "next-themes";
+import { usePathname } from "next/navigation";
 
 const Navbar = () => {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
 
   // För att förhindra hydration mismatch (client-side only)
   useEffect(() => {
@@ -32,7 +34,12 @@ const Navbar = () => {
           </Link>
           {session ? (
             <>
-              <Link href="/dashboard" className="hover:underline">
+              <Link
+                href="/dashboard"
+                className={`hover:underline ${
+                  pathname === "/dashboard" ? "font-bold underline" : ""
+                }`}
+              >
                 Dashboard
               </Link>
               <button onClick={() => signOut()} className="hover:underline">
