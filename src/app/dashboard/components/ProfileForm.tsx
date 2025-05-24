@@ -25,7 +25,7 @@ export default function ProfileForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>();
 
-  useSession(); // vi använder session indirekt, men behövs ej just nu
+  useSession(); // valfri i detta fall
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,7 +43,7 @@ export default function ProfileForm() {
   const onSubmit = async (data: FormData) => {
     try {
       await axios.put("/api/user/profile", data);
-      setIsSaved(true); // visa tackmeddelande
+      setIsSaved(true);
     } catch (error) {
       console.error("Fel vid uppdatering", error);
       alert("Det gick inte att uppdatera profilen.");

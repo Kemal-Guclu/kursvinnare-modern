@@ -6,6 +6,7 @@ const config: Config = {
     "./components/**/*.{ts,tsx,js,jsx}",
     "./src/**/*.{ts,tsx,js,jsx}",
   ],
+  darkMode: "class", // Aktivera dark mode med class
   theme: {
     extend: {},
   },
