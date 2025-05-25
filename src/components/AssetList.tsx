@@ -1,32 +1,114 @@
-import Link from "next/link";
+// components/AssetList.tsx
+"use client";
 
-type AssetListProps = {
-  title: string;
-  assets: string[];
+import { useEffect, useState } from "react";
+
+type Asset = {
+  symbol: string;
+  name: string;
+  type: "stock" | "crypto";
 };
 
-function slugify(name: string) {
-  return encodeURIComponent(name.toLowerCase().replace(/\s+/g, "-"));
-}
+type PriceData = {
+  price: number | null;
+  change24h: number | null;
+};
 
-export function AssetList({ title, assets }: AssetListProps) {
+type Props = {
+  title: string;
+  assets: Asset[];
+};
+
+export default function AssetList({ title, assets }: Props) {
+  const [prices, setPrices] = useState<Record<string, PriceData>>({});
+
+  useEffect(() => {
+    async function fetchPrices() {
+      const newPrices: Record<string, PriceData> = {};
+      await Promise.all(
+        assets.map(async (asset) => {
+          try {
+            const res = await fetch(
+              `/api/price?symbol=${encodeURIComponent(asset.symbol)}&type=${
+                asset.type
+              }`
+            );
+            const data = await res.json();
+
+            // API: price, change24h
+            newPrices[asset.symbol] = {
+              price: data.price ?? null,
+              change24h: data.change24h ?? null,
+            };
+          } catch (error) {
+            console.error(
+              `Fel vid hämtning av pris för ${asset.symbol}:`,
+              error
+            );
+            newPrices[asset.symbol] = { price: null, change24h: null };
+          }
+        })
+      );
+      setPrices(newPrices);
+    }
+
+    fetchPrices();
+
+    // Uppdatera var 60:e sekund
+    const interval = setInterval(fetchPrices, 60000);
+    return () => clearInterval(interval);
+  }, [assets]);
+
   return (
-    <section className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow">
-      <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-        {title}
-      </h3>
-      <ul className="space-y-2">
-        {assets.map((asset) => (
-          <li key={asset}>
-            <Link
-              href={`/asset/${slugify(asset)}`}
-              className="block px-4 py-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 text-gray-800 dark:text-gray-100"
-            >
-              {asset}
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <section>
+      <h2 className="text-xl font-semibold mb-4">{title}</h2>
+      <table className="w-full text-left border-collapse border border-gray-300 dark:border-gray-600">
+        <thead>
+          <tr>
+            <th className="border border-gray-300 px-3 py-2">Namn</th>
+            <th className="border border-gray-300 px-3 py-2">Symbol</th>
+            <th className="border border-gray-300 px-3 py-2">Pris (USD)</th>
+            <th className="border border-gray-300 px-3 py-2">24h %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {assets.map(({ symbol, name }) => {
+            const priceData = prices[symbol];
+            const price = priceData?.price;
+            const change = priceData?.change24h;
+
+            return (
+              <tr
+                key={symbol}
+                className="hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <td className="border border-gray-300 px-3 py-2">{name}</td>
+                <td className="border border-gray-300 px-3 py-2">{symbol}</td>
+                <td className="border border-gray-300 px-3 py-2">
+                  {price !== null && price !== undefined
+                    ? price.toFixed(2)
+                    : "–"}
+                </td>
+                <td
+                  className={`border border-gray-300 px-3 py-2 font-semibold ${
+                    change !== null && change !== undefined
+                      ? change > 0
+                        ? "text-green-600"
+                        : change < 0
+                        ? "text-red-600"
+                        : ""
+                      : ""
+                  }`}
+                >
+                  {change !== null && change !== undefined
+                    ? `${change.toFixed(2)}%`
+                    : "–"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </section>
   );
 }
