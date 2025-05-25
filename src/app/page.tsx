@@ -8,31 +8,12 @@ export default function HomePage() {
     <div className="space-y-12">
       <Hero />
       <ChartSection />
+
+      {/* Tre dynamiska tillgångslistor */}
       <div className="grid gap-8 md:grid-cols-3">
-        <AssetList
-          title="Svenska Aktier"
-          assets={[
-            { symbol: "VOLV-B.ST", name: "Volvo", type: "stock" },
-            { symbol: "INVE-B.ST", name: "Investor", type: "stock" },
-            { symbol: "HM-B.ST", name: "H&M", type: "stock" },
-          ]}
-        />
-        <AssetList
-          title="Utländska Aktier"
-          assets={[
-            { symbol: "AAPL", name: "Apple", type: "stock" },
-            { symbol: "TSLA", name: "Tesla", type: "stock" },
-            { symbol: "AMZN", name: "Amazon", type: "stock" },
-          ]}
-        />
-        <AssetList
-          title="Kryptovalutor"
-          assets={[
-            { symbol: "BTC", name: "Bitcoin", type: "crypto" },
-            { symbol: "ETH", name: "Ethereum", type: "crypto" },
-            { symbol: "SOL", name: "Solana", type: "crypto" },
-          ]}
-        />
+        <AssetList title="Svenska Aktier" type="stock-se" />
+        <AssetList title="Utländska Aktier" type="stock-us" />
+        <AssetList title="Kryptovalutor" type="crypto" />
       </div>
     </div>
   );

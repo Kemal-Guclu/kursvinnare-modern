@@ -1,105 +1,50 @@
-"use client";
-
+// app/asset/[slug]/page.tsx
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { toast } from "react-hot-toast";
+import AddToWatchlist from "@/components/AddToWatchlist"; // Importera din klientkomponent
 
-type PageProps = {
-  params: {
-    slug: string;
-  };
+type Params = {
+  slug: string;
 };
 
+type AssetPageProps = {
+  params: Params;
+};
+
+// Enkel deslugifiering för att visa namn snyggt
 function deslugify(slug: string) {
   return decodeURIComponent(slug)
     .replace(/-/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export default function AssetPage({ params }: PageProps) {
+// Funktion för att hämta prisdata från backend-API
+async function fetchPrice(slug: string, type: "crypto" | "stock") {
+  try {
+    const res = await fetch(
+      `${
+        process.env.NEXT_PUBLIC_BASE_URL || ""
+      }/api/price?symbol=${encodeURIComponent(slug)}&type=${type}`,
+      { cache: "no-store" } // "no-store" för att alltid få färsk data
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.price ?? null;
+  } catch (error) {
+    console.error("Fel vid hämtning av pris:", error);
+    return null;
+  }
+}
+
+export default async function AssetPage({ params }: AssetPageProps) {
   const { slug } = params;
   const assetName = deslugify(slug);
-  const { data: session } = useSession();
-  const [loading, setLoading] = useState(false);
-  const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [price, setPrice] = useState<number | null>(null);
-  const [type, setType] = useState<"crypto" | "stock">("stock");
 
-  // Kolla om asset är crypto eller stock baserat på slug (enkelt exempel)
-  useEffect(() => {
-    const cryptos = ["bitcoin", "ethereum", "solana"];
-    if (cryptos.includes(slug.toLowerCase())) {
-      setType("crypto");
-    } else {
-      setType("stock");
-    }
-  }, [slug]);
+  // Bestäm typ baserat på slug (exempel)
+  const cryptos = ["bitcoin", "ethereum", "solana"];
+  const type = cryptos.includes(slug.toLowerCase()) ? "crypto" : "stock";
 
-  // Hämta realtidspris från /api/price
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const res = await fetch(
-          `/api/price?symbol=${encodeURIComponent(slug)}&type=${type}`
-        );
-        const data = await res.json();
-        if (data.price !== undefined && data.price !== null) {
-          setPrice(data.price);
-        } else {
-          setPrice(null);
-        }
-      } catch (error) {
-        setPrice(null);
-        console.error("Fel vid hämtning av pris:", error);
-      }
-    };
-
-    fetchPrice();
-  }, [slug, type]);
-
-  const handleAddToWatchlist = async () => {
-    setLoading(true);
-    try {
-      const assetRes = await fetch("/api/asset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: assetName,
-          type,
-          symbol: slug.toUpperCase(),
-        }),
-      });
-
-      if (!assetRes.ok) {
-        const error = await assetRes.json();
-        toast.error("Fel: " + error.error);
-        return;
-      }
-
-      const assetData = await assetRes.json();
-
-      const res = await fetch("/api/watchlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assetId: assetData.id }),
-      });
-
-      if (res.ok) {
-        toast.success("Tillagd i din watchlist!");
-        setIsInWatchlist(true);
-      } else {
-        const error = await res.json();
-        toast.error("Fel: " + error.error);
-      }
-    } catch (err) {
-      console.error("Fel:", err);
-      toast.error("Något gick fel.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Hämta prisdata på servern
+  const price = await fetchPrice(slug, type);
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
@@ -128,20 +73,8 @@ export default function AssetPage({ params }: PageProps) {
         )}
       </p>
 
-      {session?.user && (
-        <div className="mb-4">
-          <Button
-            onClick={handleAddToWatchlist}
-            disabled={loading || isInWatchlist}
-          >
-            {loading
-              ? "Lägger till..."
-              : isInWatchlist
-              ? "Redan i watchlist"
-              : "Lägg till i Watchlist"}
-          </Button>
-        </div>
-      )}
+      {/* Lägg till en klientkomponent för watchlist-interaktion */}
+      <AddToWatchlist assetName={assetName} slug={slug} type={type} />
     </div>
   );
 }

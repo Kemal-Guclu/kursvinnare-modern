@@ -1,46 +1,45 @@
+// app/api/assets/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import slugify from "slugify";
 
-// En enkel slugifierare
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "") // ta bort accenter
-    .replace(/\s+/g, "-")
-    .replace(/[^\w\-]+/g, "")
-    .replace(/\-\-+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "");
-}
-
+// För POST-begäran: skapa asset (eller hämta om den redan finns)
 export async function POST(req: Request) {
-  const { name, type, symbol } = await req.json();
-
-  if (!name || !type || !symbol) {
-    return NextResponse.json(
-      { error: "Både name, type och symbol krävs" },
-      { status: 400 }
-    );
-  }
-
-  const slug = slugify(name);
-
   try {
-    const asset = await prisma.asset.upsert({
-      where: { slug }, // ✅ använder slug som unikt fält
-      update: {}, // om du vill uppdatera type etc, lägg till här
-      create: {
-        name,
-        slug,
-        type,
-        symbol,
-      },
+    const body = await req.json();
+    const { name, symbol, type } = body;
+
+    if (!name || !symbol || !type) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Försök hitta befintlig asset via symbol (unikt nu)
+    let asset = await prisma.asset.findUnique({
+      where: { symbol },
     });
+
+    if (!asset) {
+      const slug = slugify(name || symbol, { lower: true });
+
+      asset = await prisma.asset.create({
+        data: {
+          name,
+          symbol,
+          type,
+          slug,
+        },
+      });
+    }
 
     return NextResponse.json(asset);
   } catch (error) {
-    console.error("Fel vid asset upsert:", error);
-    return NextResponse.json({ error: "Serverfel" }, { status: 500 });
+    console.error("Asset POST error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

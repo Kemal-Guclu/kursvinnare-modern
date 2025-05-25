@@ -2,6 +2,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link"; // 🆕 Importerat Link
+import { Button } from "./ui/button";
+import { slugify } from "@/lib/slugify";
 
 type Asset = {
   symbol: string;
@@ -16,11 +19,23 @@ type PriceData = {
 
 type Props = {
   title: string;
-  assets: Asset[];
+  type: "stock-se" | "stock-us" | "crypto";
 };
 
-export default function AssetList({ title, assets }: Props) {
+export default function AssetList({ title, type }: Props) {
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [prices, setPrices] = useState<Record<string, PriceData>>({});
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    async function fetchAssets() {
+      const res = await fetch(`/api/assets?type=${type}&page=${page}`);
+      const data: Asset[] = await res.json();
+      setAssets(data);
+    }
+
+    fetchAssets();
+  }, [type, page]);
 
   useEffect(() => {
     async function fetchPrices() {
@@ -34,17 +49,12 @@ export default function AssetList({ title, assets }: Props) {
               }`
             );
             const data = await res.json();
-
-            // API: price, change24h
             newPrices[asset.symbol] = {
               price: data.price ?? null,
               change24h: data.change24h ?? null,
             };
           } catch (error) {
-            console.error(
-              `Fel vid hämtning av pris för ${asset.symbol}:`,
-              error
-            );
+            console.error(`Kunde inte hämta pris för ${asset.symbol}:`, error);
             newPrices[asset.symbol] = { price: null, change24h: null };
           }
         })
@@ -52,11 +62,7 @@ export default function AssetList({ title, assets }: Props) {
       setPrices(newPrices);
     }
 
-    fetchPrices();
-
-    // Uppdatera var 60:e sekund
-    const interval = setInterval(fetchPrices, 60000);
-    return () => clearInterval(interval);
+    if (assets.length > 0) fetchPrices();
   }, [assets]);
 
   return (
@@ -65,33 +71,37 @@ export default function AssetList({ title, assets }: Props) {
       <table className="w-full text-left border-collapse border border-gray-300 dark:border-gray-600">
         <thead>
           <tr>
-            <th className="border border-gray-300 px-3 py-2">Namn</th>
-            <th className="border border-gray-300 px-3 py-2">Symbol</th>
-            <th className="border border-gray-300 px-3 py-2">Pris (USD)</th>
-            <th className="border border-gray-300 px-3 py-2">24h %</th>
+            <th className="border px-3 py-2">Namn</th>
+            <th className="border px-3 py-2">Symbol</th>
+            <th className="border px-3 py-2">Pris</th>
+            <th className="border px-3 py-2">24h %</th>
           </tr>
         </thead>
         <tbody>
-          {assets.map(({ symbol, name }) => {
-            const priceData = prices[symbol];
-            const price = priceData?.price;
-            const change = priceData?.change24h;
+          {assets.map((asset) => {
+            const price = prices[asset.symbol]?.price;
+            const change = prices[asset.symbol]?.change24h;
 
             return (
               <tr
-                key={symbol}
+                key={asset.symbol}
                 className="hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                <td className="border border-gray-300 px-3 py-2">{name}</td>
-                <td className="border border-gray-300 px-3 py-2">{symbol}</td>
-                <td className="border border-gray-300 px-3 py-2">
-                  {price !== null && price !== undefined
-                    ? price.toFixed(2)
-                    : "–"}
+                <td className="border px-3 py-2">
+                  <Link
+                    href={`/asset/${slugify(asset.name)}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {asset.name}
+                  </Link>
+                </td>
+                <td className="border px-3 py-2">{asset.symbol}</td>
+                <td className="border px-3 py-2">
+                  {price != null ? price.toFixed(2) : "–"}
                 </td>
                 <td
-                  className={`border border-gray-300 px-3 py-2 font-semibold ${
-                    change !== null && change !== undefined
+                  className={`border px-3 py-2 font-semibold ${
+                    change != null
                       ? change > 0
                         ? "text-green-600"
                         : change < 0
@@ -100,15 +110,24 @@ export default function AssetList({ title, assets }: Props) {
                       : ""
                   }`}
                 >
-                  {change !== null && change !== undefined
-                    ? `${change.toFixed(2)}%`
-                    : "–"}
+                  {change != null ? `${change.toFixed(2)}%` : "–"}
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {/* Paginering */}
+      <div className="flex justify-between mt-4">
+        <Button
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page === 1}
+        >
+          Föregående
+        </Button>
+        <Button onClick={() => setPage((p) => p + 1)}>Nästa</Button>
+      </div>
     </section>
   );
 }

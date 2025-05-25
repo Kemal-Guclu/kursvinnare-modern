@@ -63,7 +63,7 @@ model Asset {
   slug     String   @unique
   name     String
   type     String   // t.ex. "crypto", "aktie-svensk", "aktie-usa"
-  symbol   String   // t.ex. BTC, AAPL
+  symbol   String   @unique // t.ex. BTC, AAPL
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
