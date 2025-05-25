@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import SessionWrapper from "@/components/SessionWrapper"; // Importera SessionWrapper
+import SessionWrapper from "@/components/SessionWrapper";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { Toaster } from "react-hot-toast"; // ✅ Importera Toaster
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,20 +24,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SessionWrapper>
-          <div>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SessionWrapper>
             <Navbar />
             <main className="p-4">{children}</main>
-          </div>
-        </SessionWrapper>
+            <Toaster position="top-right" /> {/* ✅ Här! */}
+          </SessionWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );
