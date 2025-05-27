@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Asset" ADD COLUMN     "change24h" DOUBLE PRECISION,
+ADD COLUMN     "price" DOUBLE PRECISION;

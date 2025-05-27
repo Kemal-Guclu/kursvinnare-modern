@@ -1,4 +1,6 @@
+// src/app/api/price/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
 const COINGECKO_IDS: Record<string, string> = {
   BTC: "bitcoin",
@@ -7,180 +9,138 @@ const COINGECKO_IDS: Record<string, string> = {
   XRP: "ripple",
   ADA: "cardano",
   DOGE: "dogecoin",
-  // Lägg till fler vid behov
+  MATIC: "matic-network",
+  AVAX: "avalanche-2",
+  DOT: "polkadot",
+  BNB: "binancecoin",
 };
 
+// Enkel in-memory rate limiter per IP (max 5 requests per 60 sekunder)
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = 5;
+const ipRequests: Map<string, number[]> = new Map();
+
+function getClientIp(req: NextRequest): string {
+  const xForwardedFor = req.headers.get("x-forwarded-for");
+  if (xForwardedFor) {
+    // Om flera IP:er är listade, ta första (klientens riktiga IP)
+    return xForwardedFor.split(",")[0].trim();
+  }
+  // Ingen proxy-header, returnera "unknown"
+  return "unknown";
+}
+
+function isRateLimited(ip: string) {
+  const now = Date.now();
+  const timestamps = ipRequests.get(ip) ?? [];
+
+  // Filtrera bort anrop äldre än RATE_LIMIT_WINDOW_MS
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  recent.push(now);
+  ipRequests.set(ip, recent);
+
+  return recent.length > RATE_LIMIT_MAX;
+}
+
 export async function GET(req: NextRequest) {
+  const ip = getClientIp(req);
+
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded, försök igen senare." },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
-  const symbol = searchParams.get("symbol");
+  let symbol = searchParams.get("symbol");
   const type = searchParams.get("type");
 
   if (!symbol || !type) {
     return NextResponse.json(
-      { error: "Missing symbol or type" },
+      { error: "symbol och type krävs" },
+      { status: 400 }
+    );
+  }
+
+  symbol = symbol.toUpperCase();
+
+  // Enkel symbol-validering: bara bokstäver och siffror
+  if (!/^[A-Z0-9]+$/.test(symbol)) {
+    return NextResponse.json(
+      { error: "Ogiltigt symbolformat" },
       { status: 400 }
     );
   }
 
   try {
-    // Crypto via CoinGecko
-    if (type === "crypto") {
-      const id = COINGECKO_IDS[symbol.toUpperCase()];
-      if (!id) {
+    const normalizedType =
+      type === "stock-se" || type === "stock-us" ? "stock" : type;
+
+    let price: number | null = null;
+    let change24h: number | null = null;
+
+    if (normalizedType === "crypto") {
+      const coinId = COINGECKO_IDS[symbol];
+      if (!coinId) {
         return NextResponse.json(
-          { error: `Unsupported crypto symbol: ${symbol}` },
+          { error: `Okänd kryptovaluta: ${symbol}` },
           { status: 400 }
         );
       }
 
-      const res = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=sek&days=1&interval=hourly`
-      );
-      if (!res.ok) throw new Error("Failed to fetch crypto data");
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=sek&include_24hr_change=true`;
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`CoinGecko-fel: ${res.statusText}`);
+      }
+
       const data = await res.json();
-      return NextResponse.json({ data });
-    }
+      const coinData = data[coinId];
 
-    // Aktier via EODHD
-    if (type === "stock") {
-      const EODHD_API_KEY = process.env.EODHD_API_KEY;
-      if (!EODHD_API_KEY) throw new Error("Missing EODHD_API_KEY");
+      price = coinData?.sek ?? null;
+      change24h = coinData?.sek_24h_change ?? null;
+    } else if (normalizedType === "stock") {
+      const token = process.env.EODHD_API_KEY;
+      if (!token) throw new Error("EODHD_API_KEY saknas");
 
-      const res = await fetch(
-        `https://eodhd.com/api/real-time/${symbol}?api_token=${EODHD_API_KEY}&fmt=json`
-      );
-      if (!res.ok) throw new Error("Failed to fetch stock data from EODHD");
+      const url = `https://eodhd.com/api/real-time/${symbol}?api_token=${token}&fmt=json`;
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        throw new Error(`EODHD API-fel: ${res.statusText}`);
+      }
+
       const data = await res.json();
-      return NextResponse.json({ data });
-    }
 
-    return NextResponse.json({ error: "Invalid type" }, { status: 400 });
-  } catch (error: unknown) {
-    // Hantera fel och logga dem
-    if (error instanceof Error) {
-      console.error("API Error:", error.message);
+      price = data.close ?? null;
+      change24h = data.change_p ?? null;
     } else {
-      console.error("API Error:", error);
+      return NextResponse.json(
+        { error: `Okänd type: ${type}` },
+        { status: 400 }
+      );
     }
+
+    // Uppdatera Asset i databasen om pris eller change24h finns
+    if (price !== null || change24h !== null) {
+      await prisma.asset.updateMany({
+        where: { symbol },
+        data: {
+          price: price !== null ? price : null,
+          change24h: change24h !== null ? change24h : null,
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    return NextResponse.json({ price, change24h });
+  } catch (error: unknown) {
+    console.error(`Fel vid hämtning av data för ${symbol} (${type}):`, error);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      { error: "Fel vid hämtning av data" },
       { status: 500 }
     );
   }
 }
-
-// import { NextResponse } from "next/server";
-
-// const COINGECKO_URL = "https://api.coingecko.com/api/v3/coins";
-// // const FINNHUB_URL = "https://finnhub.io/api/v1/quote";
-
-// // const COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price";
-// const EODHD_URL = "https://eodhd.com/api/eod";
-
-// const COINGECKO_IDS: Record<string, string> = {
-//   BTC: "bitcoin",
-//   ETH: "ethereum",
-//   SOL: "solana",
-//   XRP: "ripple",
-//   ADA: "cardano",
-//   DOGE: "dogecoin",
-// };
-// // const FINNHUB_MAP: Record<string, string> = {
-// //   "VOLV-B.ST": "VOLV B.ST",
-// //   "VOLCAR-B.ST": "VOLCAR B.ST",
-// //   TSLA: "TSLA",
-// //   AAPL: "AAPL",
-// //   // Lägg till fler aktier vid behov
-// // };
-
-// export async function GET(req: Request) {
-//   const { searchParams } = new URL(req.url);
-//   const symbol = searchParams.get("symbol");
-//   const type = searchParams.get("type");
-
-//   if (!symbol || !type) {
-//     return NextResponse.json(
-//       { error: "Missing symbol or type" },
-//       { status: 400 }
-//     );
-//   }
-
-//   try {
-//     // Krypto
-//     if (type === "crypto") {
-//       const coinId = COINGECKO_IDS[symbol.toUpperCase()];
-//       if (!coinId) {
-//         return NextResponse.json(
-//           { error: "Unsupported crypto symbol" },
-//           { status: 400 }
-//         );
-//       }
-//       const url = `${COINGECKO_URL}/${coinId}/market_chart?vs_currency=usd&days=7`;
-
-//       const res = await fetch(url);
-//       const data = await res.json();
-
-//       if (!data || !data.prices) {
-//         return NextResponse.json(
-//           { error: "Invalid data from CoinGecko" },
-//           { status: 500 }
-//         );
-//       }
-
-//       const prices = data.prices.map(
-//         ([timestamp, price]: [number, number]) => ({
-//           date: new Date(timestamp).toISOString().split("T")[0],
-//           price: price.toFixed(2),
-//         })
-//       );
-
-//       return NextResponse.json(prices);
-//     }
-
-//     // Aktie – försök med olika suffix (för att stödja både .ST och .US)
-//     const suffixes = ["", ".ST", ".US"];
-//     type PriceEntry = { date: string; close: number };
-//     let finalData: PriceEntry[] | null = null;
-
-//     for (const suffix of suffixes) {
-//       const url = `${EODHD_URL}/${symbol}${suffix}?api_token=${process.env.EODHD_API_KEY}&fmt=json&order=d`;
-
-//       const res = await fetch(url);
-//       const text = await res.text();
-
-//       try {
-//         const json = JSON.parse(text);
-
-//         if (Array.isArray(json) && json.length >= 2) {
-//           finalData = json;
-//           break;
-//         }
-
-//         // Om json är ett error-meddelande
-//         if (typeof json === "object" && json.error) {
-//           console.warn(`API Error (${symbol}${suffix}):`, json.error);
-//         }
-//       } catch (err) {
-//         console.error(`JSON parse error for symbol ${symbol}${suffix}:`, err);
-//         // Det var inte giltig JSON
-//         console.warn(`Invalid JSON for symbol ${symbol}${suffix}:`, text);
-//       }
-//     }
-
-//     if (!finalData) {
-//       return NextResponse.json({ error: "Ticker Not Found" }, { status: 404 });
-//     }
-//     const prices = finalData.map((entry: PriceEntry) => ({
-//       date: entry.date,
-//       price: entry.close.toFixed(2),
-//     }));
-
-//     return NextResponse.json(prices);
-//   } catch (error) {
-//     console.error("Fel vid hämtning av data:", error);
-//     return NextResponse.json(
-//       { error: "Internal Server Error" },
-//       { status: 500 }
-//     );
-//   }
-// }
