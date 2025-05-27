@@ -5,7 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SessionWrapper from "@/components/SessionWrapper";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Toaster } from "react-hot-toast"; // ✅ Importera Toaster
+import { Toaster } from "@/components/ui/sonner"; // från shadcn
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,12 +31,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning={true}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <SessionWrapper>
             <Navbar />
             <main className="p-4">{children}</main>
-            <Toaster position="top-right" /> {/* ✅ Här! */}
+            <Toaster position="top-right" richColors /> {/* från sonner */}
           </SessionWrapper>
         </ThemeProvider>
       </body>

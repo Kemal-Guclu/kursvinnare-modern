@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
-import { Button } from "./ui/button"; // Justera om din Button-komponent ligger någon annanstans
+import { useState, useEffect } from "react";
+import { Button } from "./ui/button"; // Justera sökvägen vid behov
 import { toast } from "react-hot-toast";
 
 type Props = {
@@ -16,10 +16,31 @@ export default function AddToWatchlist({ assetName, slug, type }: Props) {
   const [loading, setLoading] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
 
+  // Kolla om asset redan finns i watchlist när komponenten laddas
+  useEffect(() => {
+    async function checkWatchlist() {
+      if (!session?.user) return; // Säkerställ att användare är inloggad
+
+      try {
+        const res = await fetch(`/api/watchlist/check?slug=${slug}`);
+        if (res.ok) {
+          const data = await res.json();
+          setIsInWatchlist(data.exists);
+        } else {
+          setIsInWatchlist(false);
+        }
+      } catch (error) {
+        console.error("Kunde inte kolla watchlist:", error);
+        setIsInWatchlist(false);
+      }
+    }
+    checkWatchlist();
+  }, [slug, session]);
+
   const handleAddToWatchlist = async () => {
     setLoading(true);
     try {
-      // Skapa asset i DB
+      // Skapa asset i DB (om den inte finns)
       const assetRes = await fetch("/api/asset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

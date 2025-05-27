@@ -59,13 +59,16 @@ model VerificationToken {
 }
 
 model Asset {
-  id       String   @id @default(cuid())
-  slug     String   @unique
-  name     String
-  type     String   // t.ex. "crypto", "aktie-svensk", "aktie-usa"
-  symbol   String   @unique // t.ex. BTC, AAPL
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(cuid())
+  slug       String    @unique
+  name       String
+  type       String    // t.ex. "crypto", "stock-se", "stock-us"
+  country    String?   // t.ex. "se", "us", etc.
+  symbol     String    @unique
+  price      Float?    // Senaste pris i SEK eller USD beroende på källa
+  change24h  Float?    // Senaste 24h procentuell förändring
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   watchlists Watchlist[]
 }
